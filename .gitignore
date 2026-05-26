@@ -1,0 +1,12 @@
+# Gradle
+.gradle/
+build/
+# Android Studio
+.idea/
+.local.properties
+# Misc
+*.iml
+*.log
+# Generated code
+**/build/
+**/generated/
