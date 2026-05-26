@@ -1,6 +1,7 @@
 package com.enchanted.app.ui.chat.components.markdown
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,12 +46,20 @@ fun CodeBlock(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(8.dp)
+            )
             .background(bgColor)
     ) {
         // Code block header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(
+                    if (isDark) Color(0xFF242428) else Color(0xFFE5E5EA)
+                )
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -71,28 +79,50 @@ fun CodeBlock(
             ) {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
-                    contentDescription = "Copy code",
+                    contentDescription = "Copy code to clipboard",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        // Code content
-        Box(
+        // Code content with line numbers
+        val codeLines = code.split("\n")
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
                 .verticalScroll(rememberScrollState())
                 .padding(12.dp)
         ) {
-            Text(
-                text = code,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-                color = if (isDark) Color(0xFFE0E0E0) else Color(0xFF1C1C1E)
-            )
+            // Line numbers column
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.padding(end = 12.dp)
+            ) {
+                codeLines.forEachIndexed { index, _ ->
+                    Text(
+                        text = "${index + 1}",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        lineHeight = 18.sp,
+                        color = if (isDark) Color(0xFFE0E0E0).copy(alpha = 0.4f)
+                                else Color(0xFF1C1C1E).copy(alpha = 0.4f)
+                    )
+                }
+            }
+            // Code text column
+            Column {
+                codeLines.forEach { line ->
+                    Text(
+                        text = line,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = if (isDark) Color(0xFFE0E0E0) else Color(0xFF1C1C1E)
+                    )
+                }
+            }
         }
     }
 }

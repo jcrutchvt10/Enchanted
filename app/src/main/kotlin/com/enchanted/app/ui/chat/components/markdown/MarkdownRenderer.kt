@@ -1,14 +1,23 @@
 package com.enchanted.app.ui.chat.components.markdown
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -30,7 +39,7 @@ fun MarkdownText(
     var inCodeBlock = false
     var codeBlockContent = StringBuilder()
 
-    Column(modifier = modifier.padding(vertical = 4.dp, horizontal = 4.dp)) {
+    Column(modifier = modifier.padding(vertical = 2.dp, horizontal = 2.dp)) {
         var i = 0
         while (i < lines.size) {
             val line = lines[i]
@@ -90,12 +99,27 @@ fun MarkdownText(
                     )
                 }
                 line.startsWith("> ") -> {
-                    Text(
-                        text = line.removePrefix("> "),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 2.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height(20.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = line.removePrefix("> "),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                line.matches(Regex("^\\s*[-*_]{3,}\\s*$")) -> {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 }
                 line.isBlank() -> {
                     Spacer(modifier = Modifier.size(8.dp))

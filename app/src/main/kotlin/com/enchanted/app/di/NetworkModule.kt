@@ -5,6 +5,7 @@ import com.enchanted.app.data.remote.AuthInterceptor
 import com.enchanted.app.data.remote.DynamicBaseUrlInterceptor
 import com.enchanted.app.data.remote.OllamaApi
 import com.enchanted.app.data.remote.NimClient
+import com.enchanted.app.data.remote.McpClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -93,4 +94,11 @@ object NetworkModule {
     fun provideNimClient(ollamaApi: OllamaApi, settingsDataStore: SettingsDataStore): NimClient {
         return NimClient(ollamaApi, settingsDataStore)
     }
+
+    @Provides
+    @Singleton
+    fun provideMcpClient(
+        settingsDataStore: SettingsDataStore,
+        json: Json
+    ): McpClient = McpClient(settingsDataStore, json)
 }

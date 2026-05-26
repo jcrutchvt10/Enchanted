@@ -18,11 +18,13 @@ private val LightColorScheme = lightColorScheme(
     tertiary = Tertiary,
     background = BackgroundLight,
     surface = SurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
     onPrimary = OnPrimary,
     onSecondary = OnSecondary,
     onTertiary = OnTertiary,
     onBackground = TextPrimaryLight,
     onSurface = TextPrimaryLight,
+    onSurfaceVariant = TextSecondaryLight,
     error = ErrorRed,
 )
 
@@ -32,11 +34,13 @@ private val DarkColorScheme = darkColorScheme(
     tertiary = Tertiary,
     background = BackgroundDark,
     surface = SurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
     onPrimary = OnPrimary,
     onSecondary = OnSecondary,
     onTertiary = OnTertiary,
     onBackground = TextPrimaryDark,
     onSurface = TextPrimaryDark,
+    onSurfaceVariant = TextSecondaryDark,
     error = ErrorRed,
 )
 

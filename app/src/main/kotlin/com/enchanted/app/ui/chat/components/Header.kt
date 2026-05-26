@@ -1,14 +1,16 @@
 package com.enchanted.app.ui.chat.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,39 +29,45 @@ fun Header(
     onSelectModel: (LanguageModel?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onMenuTap) {
-            Icon(
-                imageVector = Icons.Default.Menu,
-                contentDescription = "Menu",
-                tint = MaterialTheme.colorScheme.onBackground
-            )
-        }
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onMenuTap) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Menu",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
 
-        if (models.isNotEmpty()) {
-            ModelSelector(
-                models = models,
-                selectedModel = selectedModel,
-                onSelectModel = onSelectModel,
-                modifier = Modifier.weight(1f)
-            )
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
-        }
+            if (models.isNotEmpty()) {
+                ModelSelector(
+                    models = models,
+                    selectedModel = selectedModel,
+                    onSelectModel = onSelectModel,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
 
-        IconButton(onClick = onNewConversationTap) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "New conversation",
-                tint = MaterialTheme.colorScheme.onBackground
-            )
+            IconButton(onClick = onNewConversationTap) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "New conversation",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
         }
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        )
     }
 }

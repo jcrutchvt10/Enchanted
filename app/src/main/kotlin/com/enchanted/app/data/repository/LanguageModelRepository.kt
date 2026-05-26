@@ -6,6 +6,7 @@ import com.enchanted.app.data.local.mapper.toEntity
 import com.enchanted.app.data.remote.NimClient
 import com.enchanted.app.data.remote.mapper.toDomain
 import com.enchanted.app.domain.model.LanguageModel
+import com.enchanted.app.domain.model.ModelProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -23,7 +24,15 @@ class LanguageModelRepository @Inject constructor(
     suspend fun refreshModels(): List<LanguageModel> {
         return try {
             val response = nimClient.listModels()
-            val models = response.models.toDomain()
+            val models = response.models.toDomain().map { model ->
+                // The DTO mapper defaults to OLLAMA, but if the active endpoint is
+                // OpenAI-compatible (e.g. NVIDIA NIM), correct the provider.
+                if (nimClient.isOpenAIEndpoint()) {
+                    model.copy(provider = ModelProvider.NVIDIA_NIM)
+                } else {
+                    model
+                }
+            }
 
             // Save to local database
             languageModelDao.deleteAll()

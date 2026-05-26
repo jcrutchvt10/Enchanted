@@ -1,5 +1,6 @@
 package com.enchanted.app.ui.sidebar
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,23 +10,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Brush
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,13 +53,21 @@ fun SidebarContent(
         // Header
         Text(
             text = "Enchanted",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        Divider()
+        HorizontalDivider()
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Navigation section label
+        Text(
+            text = "Navigation",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
 
         // Navigation items
         NavigationItem(
@@ -77,34 +84,50 @@ fun SidebarContent(
             icon = Icons.Default.Mic,
             label = "Voice",
             onClick = onVoiceTap
-    NavigationItem(
-        icon = Icons.Default.Brush,
-        label = "Studio",
-        onClick = onStudioTap
-    )
-            if (conversations.isNotEmpty()) {
-                // Replace IconButton with IconButton for Material3 styling and error emphasis
+        )
+        NavigationItem(
+            icon = Icons.Default.Brush,
+            label = "Studio",
+            onClick = onStudioTap
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+
+        // Conversation list header with delete-all button
+        if (conversations.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Conversations",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 IconButton(
                     onClick = onDeleteAll,
-                    colors = ButtonDefaults.filledTonalButtonColors(
+                    colors = IconButtonDefaults.iconButtonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ),
-                    shape = MaterialTheme.shapes.small,
-                    contentPadding = PaddingValues(8.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.DeleteSweep,
                         contentDescription = "Delete all",
-                        tint = MaterialTheme.colorScheme.onErrorContainer
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
         }
 
-        // Conversation list
         LazyColumn(
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.fillMaxHeight()
         ) {
             items(conversations, key = { it.id.toString() }) { conversation ->
                 ConversationItem(
@@ -152,19 +175,20 @@ private fun ConversationItem(
     onDelete: () -> Unit
 ) {
     val bgColor = if (isSelected)
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
     else
-        MaterialTheme.colorScheme.surface
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0f)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onTap)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .background(bgColor, shape = MaterialTheme.shapes.small),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Default.Chat,
+            imageVector = Icons.AutoMirrored.Filled.Chat,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(end = 8.dp)
@@ -184,16 +208,14 @@ private fun ConversationItem(
             )
         }
 
-        IconButton(
-            onClick = onDelete,
-            colors = ButtonDefaults.filledTonalButtonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer
-            ),
-            shape = MaterialTheme.shapes.small,
-            contentPadding = PaddingValues(4.dp),
-            modifier = Modifier.size(40.dp)
-        ) {
+            IconButton(
+                onClick = onDelete,
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                ),
+                modifier = Modifier.size(40.dp)
+            ) {
             Icon(
                 imageVector = Icons.Default.Delete,
                 contentDescription = "Delete conversation",

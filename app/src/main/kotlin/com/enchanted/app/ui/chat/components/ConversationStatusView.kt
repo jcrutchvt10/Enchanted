@@ -1,6 +1,5 @@
 package com.enchanted.app.ui.chat.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.enchanted.app.domain.model.ConversationState
 
@@ -21,7 +21,7 @@ fun ConversationStatusView(
     state: ConversationState,
     modifier: Modifier = Modifier
 ) {
-    AnimatedVisibility(visible = state is ConversationState.Loading || state is ConversationState.Error) {
+    if (state is ConversationState.Loading || state is ConversationState.Error) {
         Row(
             modifier = modifier
                 .fillMaxWidth()
@@ -30,9 +30,17 @@ fun ConversationStatusView(
         ) {
             when (state) {
                 is ConversationState.Loading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Generating",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontStyle = FontStyle.Italic
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.width(4.dp))

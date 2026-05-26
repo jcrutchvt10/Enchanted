@@ -17,6 +17,9 @@ datastore = "1.1.1"
 coil = "2.6.0"
 ksp = "2.2.10-2.0.2"
 
+# Model Context Protocol Kotlin SDK
+mcp-kotlin-sdk = { group = "io.modelcontextprotocol", name = "kotlin-sdk", version = "0.2.0" }
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -15,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.enchanted.app.ui.theme.WarningYellow
 
@@ -23,8 +25,9 @@ fun UnreachableBanner(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(WarningYellow.copy(alpha = 0.2f))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .clip(RoundedCornerShape(8.dp))
+            .background(WarningYellow.copy(alpha = 0.15f))
+            .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -35,7 +38,7 @@ fun UnreachableBanner(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "Server unreachable. Check your connection and Ollama server URL in settings.",
+            text = "Server unreachable. Check your connection and endpoint URL in settings.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface
         )

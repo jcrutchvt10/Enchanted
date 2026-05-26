@@ -3,6 +3,7 @@ package com.enchanted.app.ui.studio
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,17 +14,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
@@ -36,7 +37,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
@@ -60,14 +60,14 @@ fun StudioScreen(
     // Drawing state
     var paths by remember { mutableStateOf(listOf<Path>()) }
     var currentPath by remember { mutableStateOf(Path()) }
-    
+
     // Tool selection
     var selectedTool by remember { mutableStateOf("draw") }
-    
+
     // AI tools state
     var aiPrompt by remember { mutableStateOf("") }
     var generatedImage by remember { mutableStateOf<Bitmap?>(null) }
-    
+
     // Asset management state
     var savedArtworks by remember { mutableStateOf(listOf<Artwork>()) }
 
@@ -77,7 +77,7 @@ fun StudioScreen(
                 title = { Text("Studio") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -112,48 +112,59 @@ fun StudioScreen(
         ) {
             when (selectedTool) {
                 "draw" -> {
-                    Canvas(
+                    Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp)
-                            .pointerInput(Unit) {
-                                detectDragGestures { change, _ ->
-                                    val point = change.position
-                                    currentPath.moveTo(point.x, point.y)
-                                    currentPath.lineTo(point.x, point.y)
-                                }
-                            }
-                            .pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDragStart = { offset ->
-                                        currentPath = Path().apply {
-                                            moveTo(offset.x, offset.y)
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        paths = paths + currentPath
-                                        currentPath = Path()
-                                    }
-                                ) { change, _ ->
-                                    val point = change.position
-                                    currentPath.lineTo(point.x, point.y)
-                                }
-                            }
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                RoundedCornerShape(12.dp)
+                            )
                     ) {
-                        paths.forEach { path ->
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp)
+                                .pointerInput(Unit) {
+                                    detectDragGestures { change, _ ->
+                                        val point = change.position
+                                        currentPath.moveTo(point.x, point.y)
+                                        currentPath.lineTo(point.x, point.y)
+                                    }
+                                }
+                                .pointerInput(Unit) {
+                                    detectDragGestures(
+                                        onDragStart = { offset ->
+                                            currentPath = Path().apply {
+                                                moveTo(offset.x, offset.y)
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            paths = paths + currentPath
+                                            currentPath = Path()
+                                        }
+                                    ) { change, _ ->
+                                        val point = change.position
+                                        currentPath.lineTo(point.x, point.y)
+                                    }
+                                }
+                        ) {
+                            paths.forEach { path ->
+                                drawPath(
+                                    path = path,
+                                    color = Color.Black,
+                                    style = Stroke(width = 5f)
+                                )
+                            }
                             drawPath(
-                                path = path,
+                                path = currentPath,
                                 color = Color.Black,
                                 style = Stroke(width = 5f)
                             )
                         }
-                        drawPath(
-                            path = currentPath,
-                            color = Color.Black,
-                            style = Stroke(width = 5f)
-                        )
                     }
                 }
+
                 "ai" -> {
                     Column(
                         modifier = Modifier
@@ -174,6 +185,12 @@ fun StudioScreen(
                         ) {
                             Text("Generate")
                         }
+                        Text(
+                            text = "Placeholder — AI generation not yet implemented",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                         generatedImage?.let { bitmap ->
                             Image(
                                 bitmap = bitmap.asImageBitmap(),
@@ -185,6 +202,7 @@ fun StudioScreen(
                         }
                     }
                 }
+
                 "assets" -> {
                     Column(
                         modifier = Modifier
@@ -245,5 +263,4 @@ private fun generateArtwork(prompt: String, onResult: (Bitmap) -> Unit) {
 
 private fun exportArtwork() {
     // TODO: Implement export functionality (PNG, JPEG, etc.)
-}
 }

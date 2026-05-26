@@ -12,6 +12,7 @@ import com.enchanted.app.domain.model.Conversation
 import com.enchanted.app.domain.model.ConversationState
 import com.enchanted.app.domain.model.LanguageModel
 import com.enchanted.app.domain.model.Message
+import com.enchanted.app.domain.model.defaultSettingsFor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -173,7 +174,7 @@ class ConversationRepository @Inject constructor(
             nimClient.chatStream(
                 model = model.name,
                 messages = chatMessages,
-                temperature = null, // Use server defaults
+                settings = defaultSettingsFor(model.name),
                 onChunk = { content, done ->
                     accumulatedContent += content
                     val now = System.currentTimeMillis()

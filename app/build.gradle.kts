@@ -90,6 +90,9 @@ dependencies {
     // Image loading
     implementation(libs.coil.compose)
 
+    // Model Context Protocol (MCP) SDK
+    implementation("io.modelcontextprotocol:kotlin-sdk:0.12.0")
+
     // Debug
     debugImplementation(libs.androidx.ui.tooling)
 }

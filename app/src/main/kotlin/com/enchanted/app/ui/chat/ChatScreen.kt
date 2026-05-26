@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.DrawerValue
@@ -19,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.enchanted.app.domain.model.ConversationState
 import com.enchanted.app.ui.chat.components.ChatInput
-import com.enchanted.app.ui.chat.components.ConversationStatusView
 import com.enchanted.app.ui.chat.components.EmptyConversationView
 import com.enchanted.app.ui.chat.components.Header
 import com.enchanted.app.ui.chat.components.MessageList
@@ -126,6 +126,7 @@ private fun ChatContent(
             .fillMaxSize()
             .statusBarsPadding()
             .navigationBarsPadding()
+            .imePadding()
     ) {
         Header(
             onMenuTap = onMenuTap,
@@ -154,8 +155,6 @@ private fun ChatContent(
                 )
             }
         }
-
-        // Removed ConversationStatusView from here as it's now inside MessageList
 
         if (!isReachable) {
             UnreachableBanner()

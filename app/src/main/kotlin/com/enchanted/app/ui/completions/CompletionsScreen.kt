@@ -86,6 +86,13 @@ fun CompletionsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "No completion instructions yet",
                     style = MaterialTheme.typography.bodyLarge,
@@ -104,7 +111,7 @@ fun CompletionsScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(instructions, key = { it.id.toString() }) { instruction ->
                     CompletionCard(
@@ -162,7 +169,16 @@ private fun CompletionCard(
                         modifier = Modifier.size(18.dp)
                     )
                 }
-                DeleteInstructionChip(onDelete = onDelete)
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete instruction",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(

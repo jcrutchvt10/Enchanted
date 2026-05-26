@@ -18,13 +18,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
@@ -132,24 +133,30 @@ fun ChatInput(
             }
         }
 
+        // Divider above input
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
+
         // Input row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.Bottom
         ) {
-            // Attachment button
+            // Image attachment button
             IconButton(
                 onClick = { imagePickerLauncher.launch("image/*") },
                 enabled = !isStreaming
             ) {
                 Icon(
-                    imageVector = Icons.Default.AttachFile,
+                    imageVector = Icons.Default.Add,
                     contentDescription = "Attach image",
-                    tint = if (selectedImageUri != null) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
+                    tint = if (selectedImageUri != null)
+                        MaterialTheme.colorScheme.primary
+                    else
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -158,14 +165,14 @@ fun ChatInput(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(28.dp))
                     .border(
                         width = 1.dp,
                         color = if (isStreaming)
                             MaterialTheme.colorScheme.primary
                         else
                             MaterialTheme.colorScheme.outline,
-                        shape = RoundedCornerShape(24.dp)
+                        shape = RoundedCornerShape(28.dp)
                     )
             ) {
                 TextField(
@@ -180,7 +187,7 @@ fun ChatInput(
                         unfocusedIndicatorColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent
                     ),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(28.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
                         onSend = {
@@ -231,7 +238,7 @@ fun ChatInput(
                     )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Send,
+                        imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Send message"
                     )
                 }

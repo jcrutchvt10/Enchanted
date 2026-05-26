@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
@@ -58,8 +59,9 @@ fun MessageBubble(
             Box(
                 modifier = Modifier
                     .padding(end = 8.dp)
-                    .size(32.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
+                    .shadow(2.dp, CircleShape)
                     .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
@@ -73,7 +75,7 @@ fun MessageBubble(
         }
 
         Column(
-            modifier = Modifier.widthIn(max = 300.dp)
+            modifier = Modifier.widthIn(max = 360.dp)
         ) {
             // Attached image
             if (message.imageData != null) {
@@ -96,9 +98,10 @@ fun MessageBubble(
                         .fillMaxWidth()
                         .padding(bottom = 4.dp)
                         .clip(RoundedCornerShape(8.dp))
+                        .shadow(1.dp, RoundedCornerShape(8.dp))
                         .background(
                             if (MaterialTheme.colorScheme.background.luminance() < 0.5f)
-                                Color(0xFF1A1A2E) else Color(0xFFF0F0FF)
+                                Color(0xFF1C1C3A) else Color(0xFFF5F0FF)
                         )
                         .padding(8.dp)
                 ) {
@@ -136,16 +139,16 @@ fun MessageBubble(
             val showContent = isUser || message.realContent.isNotBlank() || (!message.hasThink && !message.done)
             
             if (showContent) {
+                val bubbleShape = RoundedCornerShape(
+                    topStart = 16.dp,
+                    topEnd = 16.dp,
+                    bottomStart = if (isUser) 16.dp else 4.dp,
+                    bottomEnd = if (isUser) 4.dp else 16.dp
+                )
                 Box(
                     modifier = Modifier
-                        .clip(
-                            RoundedCornerShape(
-                                topStart = 16.dp,
-                                topEnd = 16.dp,
-                                bottomStart = if (isUser) 16.dp else 4.dp,
-                                bottomEnd = if (isUser) 4.dp else 16.dp
-                            )
-                        )
+                        .clip(bubbleShape)
+                        .shadow(1.dp, bubbleShape)
                         .background(bubbleColor)
                         .padding(12.dp)
                 ) {
@@ -185,8 +188,9 @@ fun MessageBubble(
             Box(
                 modifier = Modifier
                     .padding(start = 8.dp)
-                    .size(32.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
+                    .shadow(2.dp, CircleShape)
                     .background(MaterialTheme.colorScheme.secondary),
                 contentAlignment = Alignment.Center
             ) {

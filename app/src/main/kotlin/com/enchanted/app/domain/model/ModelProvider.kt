@@ -1,5 +1,6 @@
 package com.enchanted.app.domain.model
 
 enum class ModelProvider {
-    OLLAMA
+    OLLAMA,
+    NVIDIA_NIM
 }

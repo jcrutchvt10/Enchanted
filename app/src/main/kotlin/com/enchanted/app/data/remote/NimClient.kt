@@ -12,9 +12,13 @@ import com.enchanted.app.data.remote.dto.ModelsResponse
 import com.enchanted.app.data.remote.dto.OpenAIChatRequest
 import com.enchanted.app.data.remote.dto.OpenAIChatResponse
 import com.enchanted.app.data.remote.dto.OpenAIModelsResponse
+import com.enchanted.app.data.remote.dto.chatTemplateKwargsFor
+import com.enchanted.app.domain.model.ModelSettings
+import com.enchanted.app.domain.model.defaultSettingsFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import okhttp3.ResponseBody
 import retrofit2.Response
 import java.io.BufferedReader
@@ -24,10 +28,21 @@ import javax.inject.Singleton
 
 /**
  * Client for OpenAI‑compatible endpoints such as NVIDIA NIM.
- * It reuses the existing logic from the former OllamaClient but is renamed to avoid any
- * reference to Ollama. All functionality remains identical – the client automatically
- * detects whether the configured base URL speaks the OpenAI API and handles streaming
- * responses, model listing, and reachability checks.
+ *
+ * Automatically detects whether the configured base URL speaks the OpenAI API
+ * (e.g. NVIDIA NIM, any /v1-style endpoint) or the native Ollama API, and
+ * dispatches requests accordingly.
+ *
+ * Streaming:
+ * - Standard SSE (`data: {json} … data: [DONE]`).
+ * - Reasoning/thinking content is detected in the delta under these field names
+ *   (checked in order): [reasoning_content], [reasoning], [thought], [thinking].
+ * - Inline `<think>` / `</think>` tags inside the `content` field are also
+ *   detected and rendered with the same think-block wrapping.
+ *
+ * Reasoning models (DeepSeek V4, Qwen3, Nemotron, GLM, etc.) typically require
+ * a `chat_template_kwargs` object and sometimes `reasoning_effort`. The client
+ * infers sensible defaults from the model name — see [chatTemplateKwargsFor].
  */
 @Singleton
 class NimClient @Inject constructor(
@@ -65,24 +80,47 @@ class NimClient @Inject constructor(
         }
     }
 
+    /**
+     * Non-streaming chat (simple round-trip).
+     * Preserves [reasoning] content from the response message object when
+     * the model returns it alongside [content].
+     */
     suspend fun chat(
         model: String,
         messages: List<ChatMessageDto>,
-        temperature: Float? = null
+        settings: ModelSettings? = null
     ): ChatResponse {
         ensureEndpointType()
+        val s = settings ?: defaultSettingsFor(model)
         return if (isOpenAI == true) {
             val request = OpenAIChatRequest(
                 model = model,
                 messages = messages,
                 stream = false,
-                temperature = temperature,
-                maxTokens = 4096
+                temperature = s.temperature,
+                maxTokens = s.maxTokens,
+                top_p = s.topP,
+                top_k = s.topK,
+                frequency_penalty = s.frequencyPenalty,
+                presence_penalty = s.presencePenalty,
+                stop = s.stop,
+                seed = s.seed,
+                chatTemplateKwargs = resolveTemplateKwargs(model),
+                thinkingTokenBudget = s.thinkingTokenBudget
             )
             val response = ollamaApi.chatOpenAI(request)
+            val choice = response.choices.firstOrNull()
+            val reasoningContent = choice?.message?.reasoning
             ChatResponse(
                 model = model,
-                message = response.choices.firstOrNull()?.message?.let { ChatResponseMessageDto(role = it.role, content = it.content) },
+                message = choice?.message?.let {
+                    val fullContent = if (!reasoningContent.isNullOrBlank()) {
+                        "<think>\n${reasoningContent}\n</think>\n\n${it.content}"
+                    } else {
+                        it.content
+                    }
+                    ChatResponseMessageDto(role = it.role, content = fullContent)
+                },
                 done = true
             )
         } else {
@@ -90,21 +128,46 @@ class NimClient @Inject constructor(
                 model = model,
                 messages = messages,
                 stream = false,
-                options = temperature?.let { ChatOptionsDto(it) }
+                options = ChatOptionsDto(
+                    temperature = s.temperature,
+                    topP = s.topP,
+                    topK = s.topK,
+                    numPredict = s.maxTokens,
+                    stop = s.stop,
+                    frequencyPenalty = s.frequencyPenalty,
+                    presencePenalty = s.presencePenalty,
+                    seed = s.seed
+                ).takeIf { it.hasAny() }
             )
             ollamaApi.chat(request)
         }
     }
 
+    /**
+     * Streaming chat. Calls [onChunk] for each content delta.
+     * [onChunk] receives (content: String, isDone: Boolean).
+     *
+     * Reasoning/thinking handling:
+     * 1. If the delta contains a dedicated reasoning field
+     *    ([reasoning_content], [reasoning], [thought], [thinking]),
+     *    the text is wrapped in `<think>` … `</think>` tags.
+     * 2. If the delta content contains literal `<think>` / `</think>` markers
+     *    (used by some models such as MiniMax or Nemotron), the markers are
+     *    forwarded as-is so the downstream UI can render them appropriately.
+     */
     suspend fun chatStream(
         model: String,
         messages: List<ChatMessageDto>,
-        temperature: Float? = null,
+        settings: ModelSettings? = null,
         onChunk: suspend (String, Boolean) -> Unit
     ) {
         ensureEndpointType()
         Log.d("NimClient", "chatStream: model=$model, isOpenAI=$isOpenAI")
         var isThinking = false
+        var doneSent = false
+        val s = settings ?: defaultSettingsFor(model)
+        val templateKwargs = resolveTemplateKwargs(model)
+        val reasoningEffort = resolveReasoningEffort(model)
         withContext(Dispatchers.IO) {
             try {
                 val response: Response<ResponseBody> = if (isOpenAI == true) {
@@ -112,21 +175,36 @@ class NimClient @Inject constructor(
                         model = model,
                         messages = messages,
                         stream = true,
-                        temperature = temperature ?: 1.0f,
-                        maxTokens = 1024,
-                        top_p = 0.95f,
-                        frequency_penalty = 0.0f,
-                        presence_penalty = 0.0f,
-                        n = 1
+                        temperature = s.temperature,
+                        maxTokens = s.maxTokens,
+                        top_p = s.topP,
+                        top_k = s.topK,
+                        frequency_penalty = s.frequencyPenalty,
+                        presence_penalty = s.presencePenalty,
+                        stop = s.stop,
+                        seed = s.seed,
+                        n = 1,
+                        chatTemplateKwargs = templateKwargs,
+                        reasoningEffort = reasoningEffort,
+                        thinkingTokenBudget = s.thinkingTokenBudget
                     )
-                    Log.d("NimClient", "Sending OpenAI request: ${json.encodeToString(OpenAIChatRequest.serializer(), request)}")
+                    Log.d("NimClient", "OpenAI request: model=$model maxTokens=${s.maxTokens} temp=${s.temperature} topP=${s.topP} thinkingBudget=${s.thinkingTokenBudget} reasoningEffort=$reasoningEffort templateKwargs=$templateKwargs")
                     ollamaApi.chatStreamOpenAI(request)
                 } else {
                     val request = ChatRequest(
                         model = model,
                         messages = messages,
                         stream = true,
-                        options = temperature?.let { ChatOptionsDto(it) }
+                        options = ChatOptionsDto(
+                            temperature = s.temperature,
+                            topP = s.topP,
+                            topK = s.topK,
+                            numPredict = s.maxTokens,
+                            stop = s.stop,
+                            frequencyPenalty = s.frequencyPenalty,
+                            presencePenalty = s.presencePenalty,
+                            seed = s.seed
+                        ).takeIf { it.hasAny() }
                     )
                     ollamaApi.chatStream(request)
                 }
@@ -153,48 +231,147 @@ class NimClient @Inject constructor(
                         if (currentLine.startsWith("data: ")) {
                             val data = currentLine.removePrefix("data: ").trim()
                             if (data == "[DONE]") {
-                                if (isThinking) {
-                                    onChunk("\n</think>\n\n", false)
-                                    isThinking = false
-                                }
+                                closeThinkBlock(onChunk, isThinking).also { isThinking = false }
                                 onChunk("", true)
+                                doneSent = true
                                 break
                             }
                             try {
                                 val chatResponse = json.decodeFromString<OpenAIChatResponse>(data)
                                 val delta = chatResponse.choices.firstOrNull()?.delta
-                                val reasoning = delta?.reasoning_content ?: delta?.reasoning ?: delta?.thought ?: delta?.thinking
+                                val reasoning = delta?.reasoning_content
+                                    ?: delta?.reasoning
+                                    ?: delta?.thought
+                                    ?: delta?.thinking
                                 val content = delta?.content
-                                if (!reasoning.isNullOrEmpty()) {
+
+                                // ── Handle separate reasoning field ──
+                                if (!reasoning.isNullOrBlank()) {
                                     if (!isThinking) {
                                         onChunk("<think>\n", false)
                                         isThinking = true
                                     }
                                     onChunk(reasoning, false)
-                                } else if (!content.isNullOrEmpty()) {
-                                    if (isThinking) {
-                                        onChunk("\n</think>\n\n", false)
-                                        isThinking = false
+                                }
+                                // ── Handle content field ──
+                                else if (!content.isNullOrBlank()) {
+                                    // Check for inline <think> / </think> markers in content.
+                                    val (thinkStatus, processed) = processInlineThink(content, isThinking)
+                                    isThinking = thinkStatus
+                                    if (processed.isNotEmpty()) {
+                                        onChunk(processed, false)
                                     }
-                                    onChunk(content, false)
                                 }
                             } catch (e: Exception) {
-                                // ignore malformed chunk
+                                // Malformed JSON chunk – ignore but continue streaming.
+                                Log.d("NimClient", "Skipping malformed chunk: ${e.message}")
                             }
                         }
                     } else {
                         try {
                             val chatResponse = json.decodeFromString<ChatResponse>(currentLine)
                             onChunk(chatResponse.message?.content ?: "", chatResponse.done)
+                            if (chatResponse.done) doneSent = true
                         } catch (e: Exception) {
                             Log.e("NimClient", "Error parsing Ollama chunk: ${e.message}")
                         }
                     }
                 }
+                // Ensure a final DONE signal if the server closed the stream without emitting [DONE].
+                if (!doneSent) {
+                    closeThinkBlock(onChunk, isThinking).also { isThinking = false }
+                    onChunk("", true)
+                }
             } catch (e: Exception) {
                 Log.e("NimClient", "Stream error: ${e.message}")
                 throw e
             }
+        }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    /**
+     * If [isThinking] is true, emit a closing `</think>` tag.
+     * Called when an OpenAI stream terminates or when the model switches to content.
+     */
+    private suspend fun closeThinkBlock(
+        onChunk: suspend (String, Boolean) -> Unit,
+        isThinking: Boolean
+    ) {
+        if (isThinking) {
+            onChunk("\n</think>\n\n", false)
+        }
+    }
+
+    /**
+     * Scans [text] for inline `<think>` / `</think>` markers and returns
+     * a pair (updatedIsThinking, processedText).
+     *
+     * This handles models (MiniMax, Nemotron, etc.) that embed thinking
+     * markers directly in the `content` field rather than using a dedicated
+     * delta reasoning key.
+     */
+    private fun processInlineThink(text: String, currentlyThinking: Boolean): Pair<Boolean, String> {
+        var isThinking = currentlyThinking
+        val result = StringBuilder()
+
+        // Simple stateful scan: track open/close tags in the current chunk.
+        var remaining = text
+        while (remaining.isNotEmpty()) {
+            val openIdx = remaining.indexOf("<think>")
+            val closeIdx = remaining.indexOf("</think>")
+
+            when {
+                // Whichever tag comes first wins.
+                openIdx != -1 && (closeIdx == -1 || openIdx < closeIdx) -> {
+                    // Text before the tag
+                    if (openIdx > 0) result.append(remaining.substring(0, openIdx))
+                    if (!isThinking) {
+                        result.append("<think>\n")
+                        isThinking = true
+                    }
+                    remaining = remaining.substring(openIdx + "<think>".length)
+                }
+                closeIdx != -1 -> {
+                    // Text before the tag
+                    if (closeIdx > 0) result.append(remaining.substring(0, closeIdx))
+                    if (isThinking) {
+                        result.append("\n</think>\n\n")
+                        isThinking = false
+                    }
+                    remaining = remaining.substring(closeIdx + "</think>".length)
+                }
+                else -> {
+                    result.append(remaining)
+                    remaining = ""
+                }
+            }
+        }
+        return isThinking to result.toString()
+    }
+
+    /**
+     * Returns the [chatTemplateKwargs] appropriate for [model] (or null if
+     * the model does not need them).
+     *
+     * Some NVIDIA NIM models (DeepSeek V4 in particular) **require** this
+     * field; without it the server hangs indefinitely.
+     */
+    private fun resolveTemplateKwargs(model: String): Map<String, JsonElement>? {
+        return chatTemplateKwargsFor(model)
+    }
+
+    /**
+     * Returns a [reasoningEffort] hint when the model is known to support it.
+     * Standard values: "low", "medium", "high", "max".
+     */
+    private fun resolveReasoningEffort(model: String): String? {
+        val lower = model.lowercase()
+        return when {
+            lower.contains("deepseek") -> "high"
+            lower.contains("gpt-oss") -> "high"
+            else -> null
         }
     }
 
@@ -237,6 +414,9 @@ class NimClient @Inject constructor(
             false
         }
     }
+
+    /** Returns true when the configured endpoint speaks the OpenAI-compatible API (e.g. NVIDIA NIM). */
+    fun isOpenAIEndpoint(): Boolean = isOpenAI == true
 
     fun resetEndpointType() {
         isOpenAI = null
