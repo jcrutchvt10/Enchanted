@@ -16,9 +16,12 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody
 import okhttp3.logging.HttpLoggingInterceptor
+import okhttp3.Dns
 import okio.BufferedSink
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -34,6 +37,36 @@ object NetworkModule {
         encodeDefaults = false
     }
 
+    /**
+     * Custom DNS resolver that falls back from the system DNS to
+     * Java's [InetAddress.getAllByName] when the system DNS fails.
+     *
+     * On some Android devices, the system DNS (netd) can fail to resolve
+     * certain hostnames due to Private DNS / DNS-over-TLS misconfiguration,
+     * VPN filtering, or network proxy interference.  [InetAddress.getAllByName]
+     * uses the native C library (getaddrinfo) which sometimes follows a
+     * different resolution path and can succeed where the OkHttp system DNS
+     * wrapper fails.
+     *
+     * Note: OkHttp's [Dns] is a Kotlin interface (not a `fun interface`), so
+     * SAM conversion does not apply — an explicit object expression is required.
+     */
+    private val fallbackDns = object : Dns {
+        override fun lookup(hostname: String): List<InetAddress> {
+            return try {
+                Dns.SYSTEM.lookup(hostname)
+            } catch (_: UnknownHostException) {
+                // Fallback: use Java's native resolution (bypasses netd).
+                // InetAddress resolves via getaddrinfo, which on some Android
+                // builds may use a different DNS stack.
+                InetAddress.getAllByName(hostname).toList().also {
+                    android.util.Log.w("FallbackDns", "System DNS failed for $hostname, " +
+                            "fallback resolved ${it.size} address(es): ${it.joinToString { a -> a.hostAddress }}")
+                }
+            }
+        }
+    }
+
     @Provides
     @Singleton
     fun provideOkHttpClient(
@@ -45,6 +78,7 @@ object NetworkModule {
         }
 
         return OkHttpClient.Builder()
+            .dns(fallbackDns)
             .addInterceptor(dynamicBaseUrlInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor { chain ->

@@ -25,3 +25,13 @@
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *
 -keep @androidx.room.Dao class *
+
+# Keep Tink classes and its service provider configuration files.
+# Prevents R8/ProGuard from stripping required cryptographic implementations.
+-keep class com.google.crypto.tink.** { *; }
+-keepclassmembers class com.google.crypto.tink.** { *; }
+
+# Tink references javax.lang.model.element.Modifier via errorprone annotations
+# which is not available on Android — safe to ignore at runtime.
+-dontwarn javax.lang.model.**
+-dontwarn com.google.errorprone.**

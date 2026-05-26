@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.enchanted.app.domain.model.ConversationState
 
@@ -50,10 +51,23 @@ fun ConversationStatusView(
                     )
                 }
                 is ConversationState.Error -> {
+                    val displayText = when {
+                        // DNS / host resolution errors → show a concise message
+                        state.message.contains("Cannot reach", ignoreCase = true) ||
+                        state.message.contains("resolve host", ignoreCase = true) ||
+                        state.message.contains("Unable to resolve", ignoreCase = true) ||
+                        state.message.contains("Network is unreachable", ignoreCase = true) ->
+                            "Network error: cannot reach the API server.\nCheck your connection or the API URL in Settings."
+
+                        // Everything else shows the raw message (capped)
+                        else -> "Error: ${state.message}"
+                    }
                     Text(
-                        text = "Error: ${state.message}",
+                        text = displayText,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 else -> {}

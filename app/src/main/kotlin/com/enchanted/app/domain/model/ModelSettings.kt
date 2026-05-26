@@ -37,11 +37,14 @@ data class ModelSettings(
  * known model‑family characteristics.
  *
  * The goal is to balance response quality with response time:
- *   - **Reasoning models** (DeepSeek, QwQ, GPT‑OSS) use greedy sampling
- *     (deterministic, best for coding/math) and a limited thinking‑token
- *     budget so the chain‑of‑thought doesn't run unbounded.
- *   - **Chat models** (Llama, Nemotron, Mistral, MiniMax) use moderate
- *     temperature for natural conversation and a comfortable max‑tokens cap.
+ *   - **Deep reasoning models** (DeepSeek, GPT‑OSS) use greedy sampling and
+ *     a limited thinking‑token budget (vLLM‑supported).
+ *   - **Chat reasoning models** (MiniMax M2.x, QwQ) use moderate temperature
+ *     for conversational output; they do NOT receive CoT kwargs (see
+ *     [chatTemplateKwargsFor]) because the latency exceeds NVIDIA NIM's
+ *     5‑minute gateway timeout on free‑tier accounts.
+ *   - **Chat models** (Llama, Nemotron, Mistral, MiniMax M1) use moderate
+ *     temperature for natural conversation.
  *   - **General‑purpose models** (Qwen, GLM, Kimi) use slightly higher
  *     temperature for versatility.
  *   - **Fallback** returns the server defaults.
@@ -49,16 +52,24 @@ data class ModelSettings(
 fun defaultSettingsFor(modelName: String): ModelSettings {
     val lower = modelName.lowercase()
 
-    // Reasoning / chain‑of‑thought models (DeepSeek V4/R1, QwQ, GPT‑OSS)
-    val isReasoningModel = lower.contains("deepseek") ||
-            lower.contains("qwq") ||
+    // Deep reasoning / chain‑of‑thought models — vLLM‑based, support
+    // thinking_token_budget (DeepSeek, GPT‑OSS).  Greedy temperature is
+    // appropriate for code / math.
+    val isDeepReasoningModel = lower.contains("deepseek") ||
             lower.contains("gpt-oss")
 
-    // High‑throughput chat / instruct models
+    // Light reasoning / chat‑reasoning models — do NOT support
+    // thinking_token_budget on NVIDIA NIM (MiniMax M2.x, QwQ).
+    // Use moderate temperature for conversational reasoning.
+    val isLightReasoningModel = lower.contains("qwq") ||
+            (lower.contains("minimax") && lower.contains("m2."))
+
+    // High‑throughput chat / instruct models (MiniMax M1 is a chat model)
     val isChatModel = lower.contains("llama") ||
             lower.contains("nemotron") ||
             lower.contains("mistral") ||
-            lower.contains("minimax")
+            // MiniMax M1 — non-reasoning chat model
+            (lower.contains("minimax") && !lower.contains("m2."))
 
     // General‑purpose instruct models
     val isGeneralModel = lower.contains("qwen") ||
@@ -68,11 +79,19 @@ fun defaultSettingsFor(modelName: String): ModelSettings {
             lower.contains("moonshot")
 
     return when {
-        isReasoningModel -> ModelSettings(
+        isDeepReasoningModel -> ModelSettings(
             temperature = 0.0f,          // greedy — best for coding/reasoning
             maxTokens = 16384,           // reasoning needs room for CoT
             topP = 1.0f,
-            thinkingTokenBudget = 4096   // cap thinking to bound response time
+            thinkingTokenBudget = 6144   // vLLM param; cap thinking for bounded latency
+        )
+        isLightReasoningModel -> ModelSettings(
+            temperature = 0.6f,          // moderate — conversational reasoning
+            maxTokens = 4096,            // generous but keeps TTFT manageable
+            topP = 0.95f
+            // NO thinkingTokenBudget — MiniMax M2.x / QwQ don't support it
+            // NO chat_template_kwargs / reasoning_effort — those are set
+            // separately in the request pipeline.
         )
         isChatModel -> ModelSettings(
             temperature = 0.6f,

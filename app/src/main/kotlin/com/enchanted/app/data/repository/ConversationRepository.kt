@@ -1,5 +1,6 @@
 package com.enchanted.app.data.repository
 
+import android.util.Log
 import com.enchanted.app.data.local.dao.ConversationDao
 import com.enchanted.app.data.local.dao.LanguageModelDao
 import com.enchanted.app.data.local.dao.MessageDao
@@ -13,11 +14,13 @@ import com.enchanted.app.domain.model.ConversationState
 import com.enchanted.app.domain.model.LanguageModel
 import com.enchanted.app.domain.model.Message
 import com.enchanted.app.domain.model.defaultSettingsFor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import java.net.UnknownHostException
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -166,49 +169,62 @@ class ConversationRepository @Inject constructor(
             }
         }
 
-        // Execute streaming chat
-        try {
-            var accumulatedContent = ""
-            var lastUpdateAt = 0L
+        // Execute streaming chat (with one retry for transient DNS errors)
+        var accumulatedContent = ""
+        var lastUpdateAt = 0L
+        var retried = false
 
-            nimClient.chatStream(
-                model = model.name,
-                messages = chatMessages,
-                settings = defaultSettingsFor(model.name),
-                onChunk = { content, done ->
-                    accumulatedContent += content
-                    val now = System.currentTimeMillis()
+        while (true) {
+            try {
+                nimClient.chatStream(
+                    model = model.name,
+                    messages = chatMessages,
+                    settings = defaultSettingsFor(model.name),
+                    onChunk = { content, done ->
+                        accumulatedContent += content
+                        val now = System.currentTimeMillis()
 
-                    // Update UI/DB at most every 150ms or when done
-                    if (done || now - lastUpdateAt > 150) {
-                        val lastMsg = messageDao.getLastMessage(conversationId)
-                        if (lastMsg != null) {
-                            val updated = lastMsg.copy(
-                                content = lastMsg.content + accumulatedContent,
-                                done = done
-                            )
-                            messageDao.update(updated)
-                            accumulatedContent = ""
-                            lastUpdateAt = now
-                            onMessagesUpdated()
-                        }
+                        // Update UI/DB at most every 150ms or when done
+                        if (done || now - lastUpdateAt > 150) {
+                            val lastMsg = messageDao.getLastMessage(conversationId)
+                            if (lastMsg != null) {
+                                val updated = lastMsg.copy(
+                                    content = lastMsg.content + accumulatedContent,
+                                    done = done
+                                )
+                                messageDao.update(updated)
+                                accumulatedContent = ""
+                                lastUpdateAt = now
+                                onMessagesUpdated()
+                            }
 
-                        if (done) {
-                            _conversationState.value = ConversationState.Completed
-                            onStateChange(ConversationState.Completed)
+                            if (done) {
+                                _conversationState.value = ConversationState.Completed
+                                onStateChange(ConversationState.Completed)
+                            }
                         }
                     }
+                )
+                break // Success – exit retry loop
+            } catch (e: Exception) {
+                // Retry once on DNS / UnknownHost errors
+                if (!retried && (e.isDnsError() || e.cause?.let { it.isDnsError() } == true)) {
+                    retried = true
+                    Log.w("ConversationRepo", "DNS resolution failed, retrying in 2s…")
+                    delay(2000)
+                    nimClient.resetEndpointType()
+                    continue
                 }
-            )
-        } catch (e: Exception) {
-            val errorMessages = messageDao.getMessagesByConversationList(conversationId)
-            if (errorMessages.isNotEmpty()) {
-                val lastMsg = errorMessages.last()
-                messageDao.update(lastMsg.copy(error = true))
-                onMessagesUpdated()
+                val errorMessages = messageDao.getMessagesByConversationList(conversationId)
+                if (errorMessages.isNotEmpty()) {
+                    val lastMsg = errorMessages.last()
+                    messageDao.update(lastMsg.copy(error = true))
+                    onMessagesUpdated()
+                }
+                _conversationState.value = ConversationState.Error(e.message ?: "Unknown error")
+                onStateChange(ConversationState.Error(e.message ?: "Unknown error"))
+                break
             }
-            _conversationState.value = ConversationState.Error(e.message ?: "Unknown error")
-            onStateChange(ConversationState.Error(e.message ?: "Unknown error"))
         }
     }
 
@@ -218,5 +234,15 @@ class ConversationRepository @Inject constructor(
 
     suspend fun updateMessage(message: Message) {
         messageDao.update(message.toEntity())
+    }
+
+    /** Returns `true` when [this] (or its cause chain) is an [UnknownHostException]. */
+    private fun Throwable?.isDnsError(): Boolean {
+        var t = this
+        while (t != null) {
+            if (t is UnknownHostException) return true
+            t = t.cause
+        }
+        return false
     }
 }

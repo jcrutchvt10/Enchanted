@@ -23,6 +23,7 @@ import okhttp3.ResponseBody
 import retrofit2.Response
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.net.UnknownHostException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,10 +53,25 @@ class NimClient @Inject constructor(
     private val json = Json { ignoreUnknownKeys = true }
     private var isOpenAI: Boolean? = null
 
+    /**
+     * Ensures the endpoint type (OpenAI vs Ollama) has been determined.
+     *
+     * Instead of making a separate probe request (which adds a full round‑trip
+     * before the first chat message), we assume the URL pattern is correct and
+     * skip the probe.  If the first real request fails with an endpoint‑specific
+     * error we flip the type and retry.
+     *
+     * The probe (`reachable()`) is only called when the user explicitly tests
+     * the connection from Settings, or after an endpoint change.
+     */
     private suspend fun ensureEndpointType() {
         if (isOpenAI == null) {
-            Log.d("NimClient", "Endpoint type unknown, probing...")
-            reachable()
+            // Optimistic guess based on URL — no network call.
+            val uri = settingsDataStore.getOllamaUri()
+            isOpenAI = uri.contains("nvidia", ignoreCase = true) ||
+                    uri.contains("openai", ignoreCase = true) ||
+                    uri.endsWith("/v1")
+            Log.d("NimClient", "Endpoint type inferred: isOpenAI=$isOpenAI (uri=$uri)")
         }
         if (isOpenAI == true) {
             val token = settingsDataStore.getBearerToken()
@@ -76,6 +92,9 @@ class NimClient @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("NimClient", "Failed to list models", e)
+            if (e.isDnsError() || e.cause.isDnsError()) {
+                throw dnsErrorException(e)
+            }
             throw e
         }
     }
@@ -183,7 +202,6 @@ class NimClient @Inject constructor(
                         presence_penalty = s.presencePenalty,
                         stop = s.stop,
                         seed = s.seed,
-                        n = 1,
                         chatTemplateKwargs = templateKwargs,
                         reasoningEffort = reasoningEffort,
                         thinkingTokenBudget = s.thinkingTokenBudget
@@ -284,9 +302,45 @@ class NimClient @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e("NimClient", "Stream error: ${e.message}")
+                if (e.isDnsError()) throw dnsErrorException(e)
                 throw e
             }
         }
+    }
+
+    // ── DNS / Network helpers ────────────────────────────────────────────────────
+
+    /**
+     * Returns `true` when [this] (or its cause chain) is an [UnknownHostException].
+     */
+    private fun Throwable?.isDnsError(): Boolean {
+        var t = this
+        while (t != null) {
+            if (t is UnknownHostException) return true
+            t = t.cause
+        }
+        return false
+    }
+
+    /**
+     * Returns an [Exception] whose message guides the user to diagnose
+     * DNS / network connectivity problems.
+     */
+    private suspend fun dnsErrorException(cause: Throwable? = null): Exception {
+        val host = runCatching {
+            settingsDataStore.getOllamaUri()
+                .removePrefix("https://").removePrefix("http://").split("/").firstOrNull()
+        }.getOrNull() ?: "unknown"
+
+        return Exception(
+            "Cannot reach the API server at \"$host\".\n\n" +
+            "Please check:\n" +
+            "• Your device has an active internet connection\n" +
+            "• The API URL in Settings is correct\n" +
+            "• Private DNS or VPN settings aren't blocking the connection\n" +
+            "• If on a corporate/school network, the host may need to be allowlisted",
+            cause
+        )
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -365,6 +419,16 @@ class NimClient @Inject constructor(
     /**
      * Returns a [reasoningEffort] hint when the model is known to support it.
      * Standard values: "low", "medium", "high", "max".
+     *
+     * Reasoning effort controls how deeply the model thinks before responding:
+     *   - "low"    → quick responses, minimal CoT (best for latency)
+     *   - "medium" → balanced CoT depth
+     *   - "high"   → deep reasoning (best for complex problems)
+     *   - "max"    → maximum CoT depth (slowest)
+     *
+     * NOTE: MiniMax M2.x does NOT send reasoning_effort — on NVIDIA NIM's free
+     * tier even "low" effort CoT exceeds the 5‑minute gateway timeout (504).
+     * The model works well as a fast instruct model without explicit kwargs.
      */
     private fun resolveReasoningEffort(model: String): String? {
         val lower = model.lowercase()

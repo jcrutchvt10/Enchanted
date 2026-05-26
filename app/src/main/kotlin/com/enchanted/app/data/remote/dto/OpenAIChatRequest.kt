@@ -52,38 +52,49 @@ data class OpenAIChatRequest(
 
 /**
  * Build [chatTemplateKwargs] that match a model prefix.
+ *
+ * **CRITICAL FOR PERFORMANCE:** Enabling `thinking` (a.k.a. chain‑of‑thought)
+ * forces the model to generate internal reasoning tokens *before* any visible
+ * output, which dramatically increases Time‑To‑First‑Token (TTFT) and total
+ * response time.  Only set it for models that genuinely need it.
+ *
+ * Models that require `thinking` to produce ANY output — DeepSeek — remain
+ * here.  Reasoning‑capable chat models such as MiniMax M2.x are excluded
+ * because enabling thinking  makes TTFT exceed the 5‑minute NVIDIA NIM
+ * gateway timeout on the free tier.  They work well as fast instruct models
+ * without explicit kwargs.
+ *
  * Extend this list as new model families appear.
  */
 fun chatTemplateKwargsFor(model: String): Map<String, JsonElement>? {
     val lower = model.lowercase()
-    val enable = mapOf("thinking" to JsonPrimitive(true))
 
-    return when {
-        // DeepSeek V4 / V3 / R1 — use "thinking" key
-        lower.contains("deepseek") -> enable
-
-        // GLM — use "enable_thinking"
-        lower.contains("glm") || lower.contains("z-ai") ->
-            mapOf("enable_thinking" to JsonPrimitive(true))
-
-        // Kimi / Moonshot
-        lower.contains("kimi") || lower.contains("moonshot") -> enable
-
-        // Qwen / QwQ — use "enable_thinking"
-        lower.contains("qwen") || lower.contains("qwq") ->
-            mapOf("enable_thinking" to JsonPrimitive(true))
-
-        // Nemotron — use "enable_thinking"
-        lower.contains("nemotron") ->
-            mapOf("enable_thinking" to JsonPrimitive(true))
-
-        // MiniMax — use "thinking"
-        lower.contains("minimax") -> enable
-
-        // GPT-OSS
-        lower.contains("gpt-oss") -> enable
-
-        // Default: no kwargs; the model uses its own defaults
-        else -> null
+    // ── Models that REQUIRE thinking for correct behaviour ──────────────────
+    // DeepSeek V4 / V3 / R1: does not produce valid responses without
+    // "thinking": true in chat_template_kwargs.
+    if (lower.contains("deepseek")) {
+        return mapOf("thinking" to JsonPrimitive(true))
     }
+
+    // GPT‑OSS (Open‑Source reasoning model)
+    if (lower.contains("gpt-oss")) {
+        return mapOf("thinking" to JsonPrimitive(true))
+    }
+
+    // ── Models where thinking is OPTIONAL (latency cost) ────────────────────
+    // Only enable when the model name explicitly indicates a reasoning variant.
+
+    // QwQ (Qwen reasoning model) — use "enable_thinking"
+    if (lower.contains("qwq")) {
+        return mapOf("enable_thinking" to JsonPrimitive(true))
+    }
+
+    // Kimi reasoning models
+    if (lower.contains("kimi") && lower.contains("reasoning")) {
+        return mapOf("thinking" to JsonPrimitive(true))
+    }
+
+    // Default: no kwargs — the model uses its own defaults, providing the
+    // fastest possible response time for chat / instruct use.
+    return null
 }
